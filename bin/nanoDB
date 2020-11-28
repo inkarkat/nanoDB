@@ -22,7 +22,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-n|--namespace NAMESPACE] -t|--table TABLE [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
@@ -55,6 +55,7 @@ HELPDESCRIPTION
     --base-type config|data|runtime|cache|temp
 				Set the base directory based on the passed
 				characterization. The default is "config".
+    --comment|-c COMMENT	Optional commented first line in the data file.
     --namespace|-n NAMESPACE	Optional application / use case for this tool's
 				use. Determines the configuration directory.
     --table|-t TABLE		Category in the context of the application.
@@ -123,10 +124,11 @@ multipleActionsError()
     printUsage "$1" >&2
     exit 2
 }
+comment=
 namespace=
 table=
-line=
 key=
+unset value
 action=
 typeset -a queriedColumns=()
 typeset -A updatedColumnValues=()
@@ -152,6 +154,7 @@ do
 			esac
 			shift
 			;;
+	--comment|-c)	shift; comment="${1//$'\n'/ }"; shift;;
 	--namespace|-n)	shift; namespace="$1"; shift;;
 	--table|-t)	shift; table="$1"; shift
 			if [[ "$table" = */* ]]; then
@@ -161,7 +164,18 @@ do
 			    exit 2
 			fi >&2
 			;;
-	--update|-u)	shift; [ "$action" ] && multipleActionsError "$0"; action='update'; line="$1"; shift;;
+	--update|-u)	shift; [ "$action" ] && multipleActionsError "$0"; action='update'
+			case "$1" in
+			    *=*)    key="${1%%=*}"; value="${1#*=}";;
+			    *)	    key="$1";;
+			esac
+			shift
+			if ! checkKey "$key"; then
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
 	--value|-v)	shift; value="$1"; shift;;
 	--delete|-d)	shift; [ "$action" ] && multipleActionsError "$0"; action='delete'; key="$1"; shift
 			if ! checkKey "$key"; then
@@ -238,6 +252,51 @@ query()
     printf '%s\n' "$value"
 }
 
+initializeTable()
+{
+    if [ -n "$comment" ]; then
+	printf > "$TABLE_FILESPEC" '# %s\n' "$comment"
+    else
+	printf '\n' > "$TABLE_FILESPEC"
+    fi
+}
+update()
+{
+    [ -s "$TABLE_FILESPEC" ] || initializeTable  # Need to write at least one line so that sed does processing; can use that for a descriptive header.
+
+    if [ -z "${value+t}" ]; then
+	echo 'ERROR: Need VALUE to update.'
+	echo
+	printUsage "$0"
+	exit 2
+    fi >&2
+
+    local quotedValue; printf -v quotedValue %q "$value"
+    local line="${key}=${quotedValue//\\/\\\\}"
+
+    # If we find the key, duplicate its line into the hold space; this serves as
+    # a marker that we don't need to append the line at the end.
+    # On the last line, we check the hold space, and skip further processing of
+    # the line if the hold space isn't empty.
+    sed -i \
+	"${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
+	-e "/^${key}=/h" \
+	-e "/^${key}=/c\\
+$line"  \
+	-e ':skipHeader' \
+	-e '${ x; /./{ x; b; }; x; }' \
+	-e "\$a\\
+$line"  \
+	-e b \
+	-e ':replaceHeader' \
+	-e "c\\
+$line"  \
+	-- "$TABLE_FILESPEC" || return 1
+}
+
+
+
+typeset -a IGNORE_HEADER_LINE_SED_ARGS=(-e '1{ /^$/b replaceHeader; /^#/b skipHeader }')
 
 readonly CONFIG_DIRSPEC="${baseDir}${namespace:+/}$namespace"
 [ -d "$CONFIG_DIRSPEC" ] || mkdir -p -- "$CONFIG_DIRSPEC" || { printf >&2 'ERROR: Could not initialize database store at %s!\n' "$CONFIG_DIRSPEC"; exit 1; }

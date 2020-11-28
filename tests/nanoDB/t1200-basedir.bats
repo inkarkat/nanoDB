@@ -8,7 +8,6 @@
 }
 
 @test "a non-existing base dir is created" {
-skip
     local newDir="${BATS_TMPDIR}/new"
     rm -rf "$newDir"
     run nanoDB --basedir "$newDir" --table "$BATS_TEST_NAME" --update "key=value"
