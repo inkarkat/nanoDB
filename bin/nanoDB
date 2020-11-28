@@ -281,14 +281,13 @@ update()
     sed -i \
 	"${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
 	-e "/^${key}=/h" \
-	-e "/^${key}=/c\\
-$line"  \
+	-e "/^${key}=/b replaceWithUpdate" \
 	-e ':skipHeader' \
 	-e '${ x; /./{ x; b; }; x; }' \
 	-e "\$a\\
 $line"  \
 	-e b \
-	-e ':replaceHeader' \
+	-e ':replaceWithUpdate' \
 	-e "c\\
 $line"  \
 	-- "$TABLE_FILESPEC" || return 1
@@ -296,7 +295,7 @@ $line"  \
 
 
 
-typeset -a IGNORE_HEADER_LINE_SED_ARGS=(-e '1{ /^$/b replaceHeader; /^#/b skipHeader }')
+typeset -a IGNORE_HEADER_LINE_SED_ARGS=(-e '1{ /^$/b replaceWithUpdate; /^#/b skipHeader }')
 
 readonly CONFIG_DIRSPEC="${baseDir}${namespace:+/}$namespace"
 [ -d "$CONFIG_DIRSPEC" ] || mkdir -p -- "$CONFIG_DIRSPEC" || { printf >&2 'ERROR: Could not initialize database store at %s!\n' "$CONFIG_DIRSPEC"; exit 1; }
