@@ -1,0 +1,246 @@
+#!/bin/bash
+###############################################################################
+##
+# FILE:		nanoDB
+# PRODUCT:	tools
+# AUTHOR:	Ingo Karkat <ingo@karkat.de>
+# DATE CREATED:	27-Nov-2020
+#
+###############################################################################
+# CONTENTS:
+#   A primitive file-based dictionary supporting CRUD operations.
+#
+# REMARKS:
+#
+# @(#)nanoDB	$Id: 4878a2b23f7aa1090d934fd98afd83460fa9c48b $	tools
+###############################################################################
+shopt -qs extglob
+
+baseDir="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-n|--namespace NAMESPACE] -t|--table TABLE [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -q|--query KEY'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -g|--get KEY'
+    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Records and retrieves individual single VALUEs based on a KEY lookup inside a
+TABLE [within NAMESPACE], using simple KEY=VALUE as storage.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --basedir DIR		Set the base directory in which the NAMESPACE
+				dir / TABLE file is stored. Defaults to
+				XDG_CONFIG_HOME=${baseDir}.
+    --base-type config|data|runtime|cache|temp
+				Set the base directory based on the passed
+				characterization. The default is "config".
+    --namespace|-n NAMESPACE	Optional application / use case for this tool's
+				use. Determines the configuration directory.
+    --table|-t TABLE		Category in the context of the application.
+				Determines the configuration file.
+    --update|-u KEY=VALUE	Record KEY=VALUE. An existing record with the
+				same KEY is overwritten, else it is appended.
+    --update KEY --value VALUE	Two-argument form.
+    -u KEY -v VALUE
+    --delete|-d KEY		Delete any existing record for KEY.
+    --drop|-D			Completely wipe all records and the table
+				configuration file itself.
+    --query|-q KEY		Query whether a value for KEY exists and return
+				it.
+    --get|-g KEY		Return the entire KEY=ESCAPED_VALUE if it exists.
+				You can \"eval\" the result to obtain a shell
+				variable named KEY with a value of VALUE.
+    --get-all|-G		Get the entire dictionary; i.e. all KEYs and
+				ESCAPED_VALUEs. If you \"eval\" this, you'll get
+				shell variables for all KEYs.
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to read / write / remove the table file.
+    2	Bad invocation, wrong or missing command-line arguments.
+    3	Internal error or failed assertion.
+    4	The queried KEY / to-be-deleted key does not exist.
+
+Example:
+HELPTEXT
+}
+
+checkKey()
+{
+    local key="${1?}"; shift
+
+    if [ -z "$key" ]; then
+	echo 'ERROR: KEY must not be empty.'
+	return 1
+    elif [[ "$key" =~ = ]]; then
+	echo 'ERROR: KEY cannot contain = character.'
+	return 1
+    elif [[ ! "$key" =~ ^[[:alpha:]_][[:alnum:]_]*$ ]]; then
+	echo 'ERROR: KEY must be a valid variable name.' "$key"
+	return 1
+    fi >&2
+
+    return 0
+}
+literalPattern()
+{
+    sed -e 's/[][\$*.^/]/\\&/g'
+}
+escapeNewline()
+{
+    sed ':a; s/\\/\\\\/g; x; G; 1s/\n//; s/\n/\\n/; h; N; s/.*\n//; ta' <<<"${1?}"
+}
+unescape()
+{
+    [ $# -ge 1 ] && line="$1"
+    echo -e "${line/#-/\\x2d}"
+}
+readonly ACTIONS='--update, --delete, --drop, --query, --get, --get-all'
+multipleActionsError()
+{
+    echo >&2 "ERROR: Only one of $ACTIONS allowed."
+    echo >&2
+    printUsage "$1" >&2
+    exit 2
+}
+namespace=
+table=
+line=
+key=
+action=
+typeset -a queriedColumns=()
+typeset -A updatedColumnValues=()
+isOmitKey=
+outputFormat=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--basedir)	shift; baseDir="$1"; shift;;
+	--base-type)	shift
+			case "$1" in
+			    config)	baseDir="${XDG_CONFIG_HOME:-$HOME/.config}";;
+			    data)	baseDir="${XDG_DATA_HOME:-$HOME/.local/share}";;
+			    runtime)	baseDir="${XDG_RUNTIME_DIR:-/run/user/$UID}";;
+			    cache)	baseDir="${XDG_CACHE_HOME:-$HOME/.cache}";;
+			    temp)	baseDir="${TMPDIR:-/tmp}";;
+			    *)		printf >&2 'ERROR: Invalid base-type "%s".\n' "$1"
+					echo >&2
+					printUsage "$0" >&2
+					exit 2
+					;;
+			esac
+			shift
+			;;
+	--namespace|-n)	shift; namespace="$1"; shift;;
+	--table|-t)	shift; table="$1"; shift
+			if [[ "$table" = */* ]]; then
+			    echo 'ERROR: TABLE must not contain slashes.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
+	--update|-u)	shift; [ "$action" ] && multipleActionsError "$0"; action='update'; line="$1"; shift;;
+	--value|-v)	shift; value="$1"; shift;;
+	--delete|-d)	shift; [ "$action" ] && multipleActionsError "$0"; action='delete'; key="$1"; shift
+			if ! checkKey "$key"; then
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
+	--drop|-D)	shift; [ "$action" ] && multipleActionsError "$0"; action='drop';;
+	--query|-q)	shift; [ "$action" ] && multipleActionsError "$0"; action='query'; key="$1"; shift
+			if ! checkKey "$key"; then
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
+	--get|-g)	shift; [ "$action" ] && multipleActionsError "$0"; action='get'; key="$1"; shift
+			if ! checkKey "$key"; then
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
+	--get-all|-G)	shift; [ "$action" ] && multipleActionsError "$0"; action='getAll';;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    [ "$action" ] && [ "$action" != 'commandline' ] && multipleActionsError "$0"
+    action='commandline'
+    needReadLock=
+
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	printf -v quotedSimpleCommand '%q ' "$@"
+	printf -v escapedFileMarker %q "$fileMarker"
+	commands+=(${commands:+;} "${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}")	# %q escapes {}, we don't want that to have it interpolated later.
+    else
+	commands=("$@")
+    fi
+fi
+if [ ! "$action" ]; then
+    echo "ERROR: No action passed: $ACTIONS"
+    echo
+    printUsage "$0"
+    exit 2
+elif [ ! "$table" ]; then
+    echo 'ERROR: No TABLE passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+
+
+getAll()
+{
+    cat -- "$TABLE_FILESPEC" 2>/dev/null || return 1
+}
+
+get()
+{
+    [ -e "$TABLE_FILESPEC" ] || return 1
+    sed -n -e "/^${key}=/{ p; q }" -e '$q 4' -- "$TABLE_FILESPEC" 2>/dev/null
+}
+
+query()
+{
+    local result; result="$(get)" || return $?
+    local value; eval "value=${result#${key}=}"
+
+    printf '%s\n' "$value"
+}
+
+
+readonly CONFIG_DIRSPEC="${baseDir}${namespace:+/}$namespace"
+[ -d "$CONFIG_DIRSPEC" ] || mkdir -p -- "$CONFIG_DIRSPEC" || { printf >&2 'ERROR: Could not initialize database store at %s!\n' "$CONFIG_DIRSPEC"; exit 1; }
+readonly TABLE_FILESPEC="${CONFIG_DIRSPEC}/$table"
+
+"$action"
