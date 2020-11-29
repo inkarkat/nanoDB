@@ -45,7 +45,7 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Records and retrieves individual single VALUEs based on a KEY lookup inside a
-TABLE [within NAMESPACE], using simple KEY=VALUE as storage.
+TABLE [within NAMESPACE], using simple KEY='VALUE' records as storage.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -57,11 +57,14 @@ HELPDESCRIPTION
 				Set the base directory based on the passed
 				characterization. The default is "config".
     --comment|-c COMMENT	Optional commented first line in the data file.
+				With this, the table file will not be
+				automatically removed when the last key is
+				deleted.
     --namespace|-n NAMESPACE	Optional application / use case for this tool's
 				use. Determines the configuration directory.
     --table|-t TABLE		Category in the context of the application.
 				Determines the configuration file.
-    --update|-u KEY=VALUE	Record KEY=VALUE. An existing record with the
+    --update|-u KEY=VALUE	Record KEY='VALUE'. An existing record with the
 				same KEY is overwritten, else it is appended.
     --update KEY --value VALUE	Two-argument form.
     -u KEY -v VALUE
@@ -75,12 +78,12 @@ HELPDESCRIPTION
 				configuration file itself.
     --query|-q KEY		Query whether a value for KEY exists and return
 				it.
-    --get|-g KEY		Return the entire KEY=ESCAPED_VALUE if it exists.
-				You can \"eval\" the result to obtain a shell
-				variable named KEY with a value of VALUE.
-    --get-all|-G		Get the entire dictionary; i.e. all KEYs and
-				ESCAPED_VALUEs. If you \"eval\" this, you'll get
-				shell variables for all KEYs.
+    --get|-g KEY		Return the entire KEY='VALUE' if it exists. You
+				can "eval" the result to obtain a shell variable
+				named KEY with a value of VALUE.
+    --get-all|-G		Get the entire dictionary; i.e. optional first
+				COMMENT, all KEYs and 'VALUE's. If you "eval"
+				this, you'll get shell variables for all KEYs.
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -306,6 +309,10 @@ delete()
 
     # If we find the key, duplicate its line into the hold space; this serves as
     # a marker that a deletion was done.
+    # If the first line is also the last, and we find the key there, just clear
+    # the line and signal a completely empty table via a special exit code, so
+    # that we can completely remove the file afterwards (as this cannot be done
+    # from within sed).
     # On the last line, we check the hold space, and indicate unsuccessful
     # deletion via a special exit status.
     sed -i \
