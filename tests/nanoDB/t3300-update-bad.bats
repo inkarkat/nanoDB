@@ -15,6 +15,7 @@ load temp_database
     run nanoDB --table "$BATS_TEST_NAME" --update "=The key is empty"
     [ $status -eq 2 ]
     [ "${lines[0]}" = 'ERROR: KEY must not be empty.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
 }
 
 @test "update of a table starting with 1 is rejected" {
@@ -23,6 +24,7 @@ load temp_database
     run nanoDB --table "$BATS_TEST_NAME" --update "1more=number is invalid at start"
     [ $status -eq 2 ]
     [ "${lines[0]}" = 'ERROR: KEY must be a valid variable name.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
 }
 
 @test "update of a table with - in key is rejected" {
@@ -31,6 +33,7 @@ load temp_database
     run nanoDB --table "$BATS_TEST_NAME" --update "x-y=dash is invalid"
     [ $status -eq 2 ]
     [ "${lines[0]}" = 'ERROR: KEY must be a valid variable name.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
 }
 
 @test "update of a table with * key is rejected" {
@@ -39,6 +42,7 @@ load temp_database
     run nanoDB --table "$BATS_TEST_NAME" --update "*=asterisk is invalid"
     [ $status -eq 2 ]
     [ "${lines[0]}" = 'ERROR: KEY must be a valid variable name.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
 }
 
 @test "update of a table with key with spaces is rejected" {
@@ -47,6 +51,7 @@ load temp_database
     run nanoDB --table "$BATS_TEST_NAME" --update "x y=space is invalid"
     [ $status -eq 2 ]
     [ "${lines[0]}" = 'ERROR: KEY must be a valid variable name.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
 }
 
 @test "update of a table with key with newline is rejected" {
@@ -55,6 +60,7 @@ load temp_database
     run nanoDB --table "$BATS_TEST_NAME" --update $'x\ny=space is invalid'
     [ $status -eq 2 ]
     [ "${lines[0]}" = 'ERROR: KEY must be a valid variable name.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
 }
 
 @test "update without value specified is rejected" {
@@ -63,4 +69,5 @@ load temp_database
     run nanoDB --table "$BATS_TEST_NAME" --update "key"
     [ $status -eq 2 ]
     [ "${lines[0]}" = 'ERROR: Need VALUE to update.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
 }

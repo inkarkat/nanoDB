@@ -23,8 +23,8 @@ printShortUsage()
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
     printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-?|-h|--help]'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE'
-    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE [...]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE [... ...]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -C|--truncate'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
@@ -114,6 +114,16 @@ checkKey()
 
     return 0
 }
+assertValue()
+{
+    if [ -n "$key" ]; then
+	echo 'ERROR: Need VALUE to update.'
+	echo
+	printUsage "$0"
+	exit 2
+    fi >&2
+}
+
 literalPattern()
 {
     sed -e 's/[][\$*.^/]/\\&/g'
@@ -139,7 +149,8 @@ comment=
 namespace=
 table=
 key=
-unset value
+typeset -a lines=()
+value=
 action=
 typeset -a queriedColumns=()
 typeset -A updatedColumnValues=()
@@ -175,19 +186,40 @@ do
 			    exit 2
 			fi >&2
 			;;
-	--update|-u)	shift; [ "$action" ] && multipleActionsError "$0"; action='update'
+	--update|-u)	shift; [ -n "$action" -a "$action" != 'update' ] && multipleActionsError "$0"; action='update'
 			case "$1" in
-			    *=*)    key="${1%%=*}"; value="${1#*=}";;
-			    *)	    key="$1";;
+			    *=*)    k="${1%%=*}"; v="${1#*=}"
+				    if ! checkKey "$k"; then
+					echo
+					printUsage "$0"
+					exit 2
+				    fi >&2
+				    printf -v quotedValue %q "$v"
+				    lines+=("${k}=${quotedValue//\\/\\\\}")
+				    ;;
+			    *)	    assertValue
+				    key="$1"
+				    if ! checkKey "$key"; then
+					echo
+					printUsage "$0"
+					exit 2
+				    fi >&2
+				    ;;
 			esac
 			shift
-			if ! checkKey "$key"; then
+			;;
+	--value|-v)	shift
+			if [ -z "$key" ]; then
+			    echo 'ERROR: Need KEY to update.'
 			    echo
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedValue %q "$1"
+			lines+=("${key}=${quotedValue//\\/\\\\}")
+			shift
+			key=
 			;;
-	--value|-v)	shift; value="$1"; shift;;
 	--delete|-d)	shift; [ "$action" ] && multipleActionsError "$0"; action='delete'; key="$1"; shift
 			if ! checkKey "$key"; then
 			    echo
@@ -274,35 +306,31 @@ initializeTable()
 }
 update()
 {
+    assertValue
+
     [ -s "$TABLE_FILESPEC" ] || initializeTable  # Need to write at least one line so that sed does processing; can use that for a descriptive header.
 
-    if [ -z "${value+t}" ]; then
-	echo 'ERROR: Need VALUE to update.'
-	echo
-	printUsage "$0"
-	exit 2
-    fi >&2
-
-    local quotedValue; printf -v quotedValue %q "$value"
-    local line="${key}=${quotedValue//\\/\\\\}"
-
-    # If we find the key, duplicate its line into the hold space; this serves as
-    # a marker that we don't need to append the line at the end.
-    # On the last line, we check the hold space, and skip further processing of
-    # the line if the hold space isn't empty.
-    sed -i \
-	"${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
-	-e "/^${key}=/h" \
-	-e "/^${key}=/b replaceWithUpdate" \
-	-e ':skipHeader' \
-	-e '${ x; /./{ x; b; }; x; }' \
-	-e "\$a\\
+    local line; for line in "${lines[@]}"
+    do
+	local key="${line%%=*}"
+	# If we find the key, duplicate its line into the hold space; this serves as
+	# a marker that we don't need to append the line at the end.
+	# On the last line, we check the hold space, and skip further processing of
+	# the line if the hold space isn't empty.
+	sed -i \
+	    "${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
+	    -e "/^${key}=/h" \
+	    -e "/^${key}=/b replaceWithUpdate" \
+	    -e ':skipHeader' \
+	    -e '${ x; /./{ x; b; }; x; }' \
+	    -e "\$a\\
 $line"  \
-	-e b \
-	-e ':replaceWithUpdate' \
-	-e "c\\
+	    -e b \
+	    -e ':replaceWithUpdate' \
+	    -e "c\\
 $line"  \
-	-- "$TABLE_FILESPEC" || return 1
+	    -- "$TABLE_FILESPEC" || return 1
+    done
 }
 
 delete()
