@@ -64,7 +64,9 @@ HELPDESCRIPTION
 				same KEY is overwritten, else it is appended.
     --update KEY --value VALUE	Two-argument form.
     -u KEY -v VALUE
-    --delete|-d KEY		Delete any existing record for KEY.
+    --delete|-d KEY		Delete any existing record for KEY. When this is
+				the last record, only a COMMENT first line will
+				remain, or the file will be completely removed.
     --drop|-D			Completely wipe all records and the table
 				configuration file itself.
     --query|-q KEY		Query whether a value for KEY exists and return
@@ -291,6 +293,34 @@ $line"  \
 	-e "c\\
 $line"  \
 	-- "$TABLE_FILESPEC" || return 1
+}
+
+delete()
+{
+    [ -e "$TABLE_FILESPEC" ] || return 1
+
+    # If we find the key, duplicate its line into the hold space; this serves as
+    # a marker that a deletion was done.
+    # On the last line, we check the hold space, and indicate unsuccessful
+    # deletion via a special exit status.
+    sed -i \
+	-e "1{ $ {/^${key}=/{ s/^.*$//; q 99; } } }" \
+	-e "/^${key}=/{ h; d; }" \
+	-e '${ x; /./{ x; b; }; x; }' \
+	-e '$q 4' \
+	-- "$TABLE_FILESPEC"
+    status=$?
+    if [ $status -eq 99 ]; then
+	drop
+	return 0
+    fi
+    return $status
+}
+
+drop()
+{
+    [ -e "$TABLE_FILESPEC" ] || return 1
+    rm -- "$TABLE_FILESPEC"
 }
 
 
