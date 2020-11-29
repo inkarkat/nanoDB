@@ -12,7 +12,7 @@
 #
 # REMARKS:
 #
-# @(#)nanoDB	$Id: 4878a2b23f7aa1090d934fd98afd83460fa9c48b $	tools
+# @(#)nanoDB	$Id$	tools
 ###############################################################################
 shopt -qs extglob
 
