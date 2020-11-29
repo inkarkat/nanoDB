@@ -26,6 +26,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -C|--truncate'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -q|--query KEY'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -g|--get KEY'
@@ -67,6 +68,9 @@ HELPDESCRIPTION
     --delete|-d KEY		Delete any existing record for KEY. When this is
 				the last record, only a COMMENT first line will
 				remain, or the file will be completely removed.
+    --truncate|-C		Delete all existing records; just keep a COMMENT
+				first line, or a single empty line. Creates the
+				table if it doesn't exist yet.
     --drop|-D			Completely wipe all records and the table
 				configuration file itself.
     --query|-q KEY		Query whether a value for KEY exists and return
@@ -118,7 +122,7 @@ unescape()
     [ $# -ge 1 ] && line="$1"
     echo -e "${line/#-/\\x2d}"
 }
-readonly ACTIONS='--update, --delete, --drop, --query, --get, --get-all'
+readonly ACTIONS='--update, --delete, --truncate, --drop, --query, --get, --get-all'
 multipleActionsError()
 {
     echo >&2 "ERROR: Only one of $ACTIONS allowed."
@@ -186,6 +190,7 @@ do
 			    exit 2
 			fi >&2
 			;;
+	--truncate|-C)	shift; [ "$action" ] && multipleActionsError "$0"; action='truncate';;
 	--drop|-D)	shift; [ "$action" ] && multipleActionsError "$0"; action='drop';;
 	--query|-q)	shift; [ "$action" ] && multipleActionsError "$0"; action='query'; key="$1"; shift
 			if ! checkKey "$key"; then
@@ -315,6 +320,20 @@ delete()
 	return 0
     fi
     return $status
+}
+
+truncate()
+{
+    if [ -r "$TABLE_FILESPEC" ]; then
+	sed -i \
+	    "${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
+	    -e d \
+	    -e ':skipHeader' \
+	    -e ':replaceWithUpdate' \
+	    -- "$TABLE_FILESPEC" || return 1
+    else
+	initializeTable
+    fi
 }
 
 drop()
