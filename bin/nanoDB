@@ -93,6 +93,8 @@ EXIT STATUS:
 
 Example:
 HELPTEXT
+printf '%q %s\n' "$(basename "$1")" '-c "app defaults" -t "$scriptName" --update backend --value "$backend"'
+printf 'eval "$(%q %s)"; echo "backend is $backend"\n' "$(basename "$1")" '-t "$scriptName" --get backend'
 }
 
 checkKey()
