@@ -16,7 +16,7 @@
 ###############################################################################
 shopt -qs extglob
 
-baseDir="${XDG_CONFIG_HOME:-$HOME/.config}"
+baseDir="${XDG_DATA_HOME:-$HOME/.local/share}"
 
 printShortUsage()
 {
@@ -49,13 +49,14 @@ TABLE [within NAMESPACE], using simple KEY='VALUE' records as storage.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
+    echo
     cat <<HELPTEXT
     --basedir DIR		Set the base directory in which the NAMESPACE
 				dir / TABLE file is stored. Defaults to
-				XDG_CONFIG_HOME=${baseDir}.
+				XDG_DATA_HOME=${baseDir}
     --base-type config|data|runtime|cache|temp
 				Set the base directory based on the passed
-				characterization. The default is "config".
+				characterization. The default is "data".
     --comment|-c COMMENT	Optional commented first line in the data file.
 				With this, the table file will not be
 				automatically removed when the last key is

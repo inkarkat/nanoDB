@@ -11,7 +11,7 @@ load canned_databases
 @test "existing table can be gotten" {
     run nanoDB --table some-entries --get-all
     [ $status -eq 0 ]
-    [ "$output" = "$(cat -- "${XDG_CONFIG_HOME}/some-entries")" ]
+    [ "$output" = "$(cat -- "${XDG_DATA_HOME}/some-entries")" ]
 }
 
 @test "get-all of non-existing table returns 1" {
