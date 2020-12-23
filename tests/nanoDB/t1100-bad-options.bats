@@ -22,3 +22,10 @@ load usage
     [ "${lines[0]}" = 'ERROR: TABLE must not contain slashes.' ]
     [ "${lines[2]%% *}" = 'Usage:' ]
 }
+
+@test "empty dict-name prints usage error" {
+    run nanoDB --table whatever --get-as-dictionary ''
+    [ $status -eq 2 ]
+    [ "${lines[0]}" = 'ERROR: Need DICT-NAME.' ]
+    [ "${lines[2]%% *}" = 'Usage:' ]
+}

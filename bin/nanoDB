@@ -30,7 +30,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -q|--query KEY'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -g|--get KEY'
-    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all'
+    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME'
 }
 printUsage()
 {
@@ -85,6 +85,9 @@ HELPDESCRIPTION
     --get-all|-G		Get the entire dictionary; i.e. optional first
 				COMMENT, all KEYs and 'VALUE's. If you "eval"
 				this, you'll get shell variables for all KEYs.
+    --get-as-dictionary DICT-NAME
+				Get all KEYs and 'VALUE's as a Bash associative
+				array named DICT-NAME if you "eval" the output.
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -138,7 +141,7 @@ unescape()
     [ $# -ge 1 ] && line="$1"
     echo -e "${line/#-/\\x2d}"
 }
-readonly ACTIONS='--update, --delete, --truncate, --drop, --query, --get, --get-all'
+readonly ACTIONS='--update, --delete, --truncate, --drop, --query, --get, --get-all, --get-as-dictionary'
 multipleActionsError()
 {
     echo >&2 "ERROR: Only one of $ACTIONS allowed."
@@ -157,6 +160,7 @@ typeset -a queriedColumns=()
 typeset -A updatedColumnValues=()
 isOmitKey=
 outputFormat=
+dictName=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -245,6 +249,16 @@ do
 			fi >&2
 			;;
 	--get-all|-G)	shift; [ "$action" ] && multipleActionsError "$0"; action='getAll';;
+	--get-as-dictionary)
+			shift; [ "$action" ] && multipleActionsError "$0"; action='getAsDictionary'
+			dictName="$1"; shift
+			if [ -z "$dictName" ]; then
+			    echo 'ERROR: Need DICT-NAME.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -281,6 +295,21 @@ fi >&2
 getAll()
 {
     cat -- "$TABLE_FILESPEC" 2>/dev/null || return 1
+}
+
+getAsDictionary()
+{
+    # Note: Though dictName must be a valid shell variable name that would need
+    # no escaping, do so to avoid sed errors and instead have an invalid name
+    # complained about by eval().
+    local literalDictName="$dictName"
+    literalDictName="${literalDictName//\\/\\\\}"
+    literalDictName="${literalDictName//&/\\&}"
+
+    sed -e "1{ /^#/{ s#\$#\\ndeclare -A ${literalDictName//#/\\#}#; b } }" \
+	-e "s#^\\([^=]\\+\\)=\\(.*\\)\$#${literalDictName//#/\\#}[\\1]=\2#" \
+	-e "1s#^#declare -A ${literalDictName//#/\\#}\\n#" \
+	-- "$TABLE_FILESPEC" 2>/dev/null || return 1
 }
 
 get()
