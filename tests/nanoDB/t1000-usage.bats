@@ -25,7 +25,7 @@ load usage
 @test "additional arguments print short help" {
     run nanoDB --table some-entries --query foo whatIsMore
     [ $status -eq 2 ]
-    assert_multiple_actions_error
+    [ "${lines[0]}" = 'ERROR: Additional argument "whatIsMore".' ]
     [ "${lines[2]%% *}" = 'Usage:' ]
 }
 

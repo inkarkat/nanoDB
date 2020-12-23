@@ -265,21 +265,11 @@ do
     esac
 done
 if [ $# -ne 0 ]; then
-    [ "$action" ] && [ "$action" != 'commandline' ] && multipleActionsError "$0"
-    action='commandline'
-    needReadLock=
-
-    if [ "$isNeedEval" ]; then
-	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
-	# undo the effects of eval.
-	printf -v quotedSimpleCommand '%q ' "$@"
-	printf -v escapedFileMarker %q "$fileMarker"
-	commands+=(${commands:+;} "${quotedSimpleCommand//"$escapedFileMarker"/$fileMarker}")	# %q escapes {}, we don't want that to have it interpolated later.
-    else
-	commands=("$@")
-    fi
-fi
-if [ ! "$action" ]; then
+    echo "ERROR: Additional argument \"$1\"."
+    echo
+    printUsage "$0"
+    exit 2
+elif [ ! "$action" ]; then
     echo "ERROR: No action passed: $ACTIONS"
     echo
     printUsage "$0"
