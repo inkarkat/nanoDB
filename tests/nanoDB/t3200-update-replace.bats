@@ -6,7 +6,7 @@ load temp_database
     initialize_table "$BATS_TEST_NAME" from one-entry
 
     nanoDB --table "$BATS_TEST_NAME" --update "foo=A Foo has been updated 43"
-    dump_table "$BATS_TEST_NAME"
+
     assert_table_row "$BATS_TEST_NAME" 1 "foo=A\ Foo\ has\ been\ updated\ 43"
     assert_table_row "$BATS_TEST_NAME" \$ "foo=A\ Foo\ has\ been\ updated\ 43"
 }
