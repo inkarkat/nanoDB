@@ -354,7 +354,7 @@ delete()
     # On the last line, we check the hold space, and indicate unsuccessful
     # deletion via a special exit status.
     sed -i \
-	-e "1{ $ {/^${key}=/{ s/^.*$//; q 99; } } }" \
+	-e "1{ \$ {/^${key}=/{ s/^.*\$//; q 99; } } }" \
 	-e "/^${key}=/{ h; d; }" \
 	-e '${ x; /./{ x; b; }; x; }' \
 	-e '$q 4' \
