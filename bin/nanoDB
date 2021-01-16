@@ -31,7 +31,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -q|--query KEY'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -g|--get KEY'
-    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME|--get-as-list SEP'
+    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME|--get-as-list SEP [--newline-formatting error|cut-off|duplicate-key|REPLACEMENT]'
 }
 printUsage()
 {
@@ -90,7 +90,17 @@ HELPDESCRIPTION
 				Get all KEYs and 'VALUE's as a Bash associative
 				array named DICT-NAME if you "eval" the output.
     --get-as-list SEP		Get all KEYs and VALUEs as a LIST, separated by
-				SEP.
+				SEP. By default, newlines in VALUE are output
+				as-is. This can be influenced via the following:
+    --newline-formatting error	Abort output and exit with 1 when a VALUE spans
+				multiple lines.
+    --newline-formatting cut-off
+				Only output VALUE up to the first newline.
+    --newline-formatting duplicate-key
+				On each subsequent line, prepend KEY and SEP to
+				it again.
+    --newline-formatting REPLACEMENT
+				Replace all newlines in VALUE with REPLACEMENT.
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -151,7 +161,8 @@ typeset -A updatedColumnValues=()
 isOmitKey=
 outputFormat=
 dictName=
-quotedListSeparator=
+listSeparator=
+newlineFormatting=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -258,8 +269,10 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
-			printf -v quotedListSeparator %q "$1"; shift
+			listSeparator="$1"; shift
 			;;
+	--newline-formatting)
+			shift; newlineFormatting="$1"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -311,7 +324,19 @@ getAsList()
 	    isFirst=
 	    [ "${line:0:1}" = '#' ] && continue
 	fi
-	eval "printf '%s\\n' ${line/=/"$quotedListSeparator"}"
+
+	eval "local unescapedLine=$line"
+
+	if [ -n "$newlineFormatting" ] && [[ "$unescapedLine" =~ $'\n' ]]; then
+	    case "$newlineFormatting" in
+		error)		exit 1;;
+		cut-off)	unescapedLine="${unescapedLine%%$'\n'*}";;
+		duplicate-key)	lineKey="${unescapedLine%%=*}"; unescapedLine="${unescapedLine//$'\n'/$'\n'"${lineKey}${listSeparator}"}";;
+		*)		unescapedLine="${unescapedLine//$'\n'/"$newlineFormatting"}";;
+	    esac
+	fi
+
+	printf '%s\n' "${unescapedLine/=/"$listSeparator"}"
     done
 }
 
