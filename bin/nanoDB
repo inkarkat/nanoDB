@@ -14,6 +14,7 @@
 #
 # @(#)nanoDB	$Id$	tools
 ###############################################################################
+set -o pipefail
 shopt -qs extglob
 
 baseDir="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -30,7 +31,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -q|--query KEY'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -g|--get KEY'
-    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME'
+    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME|--get-as-list SEP'
 }
 printUsage()
 {
@@ -88,6 +89,8 @@ HELPDESCRIPTION
     --get-as-dictionary DICT-NAME
 				Get all KEYs and 'VALUE's as a Bash associative
 				array named DICT-NAME if you "eval" the output.
+    --get-as-list SEP		Get all KEYs and VALUEs as a LIST, separated by
+				SEP.
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -128,7 +131,7 @@ assertValue()
     fi >&2
 }
 
-readonly ACTIONS='--update, --delete, --truncate, --drop, --query, --get, --get-all, --get-as-dictionary'
+readonly ACTIONS='--update, --delete, --truncate, --drop, --query, --get, --get-all, --get-as-dictionary, --get-as-list'
 multipleActionsError()
 {
     echo >&2 "ERROR: Only one of $ACTIONS allowed."
@@ -148,6 +151,7 @@ typeset -A updatedColumnValues=()
 isOmitKey=
 outputFormat=
 dictName=
+quotedListSeparator=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -246,6 +250,16 @@ do
 			    exit 2
 			fi >&2
 			;;
+	--get-as-list)
+			shift; [ "$action" ] && multipleActionsError "$0"; action='getAsList'
+			if [ $# -eq 0 ]; then
+			    echo 'ERROR: Need SEP.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			printf -v quotedListSeparator %q "$1"; shift
+			;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -287,6 +301,13 @@ getAsDictionary()
 	-e "s#^\\([^=]\\+\\)=\\(.*\\)\$#${literalDictName//#/\\#}[\\1]=\2#" \
 	-e "1s#^#declare -A ${literalDictName//#/\\#}\\n#" \
 	-- "$TABLE_FILESPEC" 2>/dev/null || return 1
+}
+getAsList()
+{
+    getAll | while IFS=$'\n' read -r line
+    do
+	eval "printf '%s\\n' ${line/=/"$quotedListSeparator"}"
+    done
 }
 
 get()
