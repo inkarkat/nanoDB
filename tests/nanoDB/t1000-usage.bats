@@ -35,3 +35,10 @@ load usage
     [ "${lines[0]}" = "ERROR: No action passed: $ACTIONS" ]
     [ "${lines[2]%% *}" = 'Usage:' ]
 }
+
+@test "no SEP after --get-as-list prints message and usage instructions" {
+    run nanoDB --table some-entries --get-as-list
+    [ $status -eq 2 ]
+    [ "${lines[0]}" = "ERROR: Need SEP." ]
+    [ "${lines[2]%% *}" = 'Usage:' ]
+}

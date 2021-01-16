@@ -1,0 +1,7 @@
+tabs=$'the\tfoo\tnow contains\t\ttabs\t'
+newline=$'this\nnow\ngoes\nover\nmultiple\n\nlines'
+squote=with\ O\'Brian\ in\ \'here\'
+dquote=\"Here\,\"\ I\ said\,\ \"leave\ it\ to\ me.\"
+quotes=I\ muttered\,\ \"I\ go\ with\ O\'Brian.\"
+various=/the\\\ \*\ is\ \{a\,b\}\ for\ @me\ in\ \?\!
+everything=$'\t\tthe what ?\n\\\tO\'Brian has "tons" of stuff\\!\n**for** // but not here'
