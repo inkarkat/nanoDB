@@ -304,8 +304,13 @@ getAsDictionary()
 }
 getAsList()
 {
+    local isFirst=t
     getAll | while IFS=$'\n' read -r line
     do
+	if [ "$isFirst" ]; then
+	    isFirst=
+	    [ "${line:0:1}" = '#' ] && continue
+	fi
 	eval "printf '%s\\n' ${line/=/"$quotedListSeparator"}"
     done
 }

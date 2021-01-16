@@ -43,7 +43,6 @@ baz-Last one here' ]
 }
 
 @test "commented table as list has the comment removed" {
-    skip
     run nanoDB --table commented-entry --get-as-list '-'
     [ $status -eq 0 ]
     [ "$output" = 'foo-The Foo is 42' ]
