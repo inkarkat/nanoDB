@@ -2,14 +2,14 @@
 
 load canned_databases
 
-@test "existing single record table can be gotten" {
+@test "existing single record table as dict can be gotten" {
     run nanoDB --table one-entry --get-as-dictionary myDict
     [ $status -eq 0 ]
     [ "$output" = "declare -A myDict
 myDict[foo]=The\ Foo\ is\ 42" ]
 }
 
-@test "existing table can be gotten" {
+@test "existing table as dict can be gotten" {
     run nanoDB --table some-entries --get-as-dictionary myDict
     [ $status -eq 0 ]
     [ "$output" = 'declare -A myDict
@@ -20,7 +20,7 @@ myDict[o_O]=A\ key\ with\ underscore\ in\ it
 myDict[baz]=Last\ one\ here' ]
 }
 
-@test "commented table still has the comment on top" {
+@test "commented table as dict still has the comment on top" {
     run nanoDB --table commented-entry --get-as-dictionary myDict
     [ $status -eq 0 ]
     [ "$output" = '# This is test data.
@@ -28,7 +28,7 @@ declare -A myDict
 myDict[foo]=The\ Foo\ is\ 42' ]
 }
 
-@test "empty commented table has the comment and the declaration only" {
+@test "empty commented table as dict has the comment and the declaration only" {
     run nanoDB --table empty --get-as-dictionary myDict
     [ $status -eq 0 ]
     [ "$output" = '# This is test data.
