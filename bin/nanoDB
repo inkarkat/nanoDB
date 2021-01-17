@@ -23,7 +23,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-r|--relaxed-key] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-R|--relaxed-key] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE [...]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE [... ...]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
@@ -283,7 +283,8 @@ do
 			;;
 	--newline-formatting)
 			shift; newlineFormatting="$1"; shift;;
-	--relaxed-key)	shift; isRelaxedKey=t;;
+	--relaxed-key|-R)
+			shift; isRelaxedKey=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
