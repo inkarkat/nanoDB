@@ -97,8 +97,8 @@ HELPDESCRIPTION
 				SEP. By default, newlines in VALUE (and KEY with
 				--relaxed-key) are output as-is. This can be
 				influenced via the following:
-    --newline-formatting error	Abort output and exit with 1 when a KEY or VALUE
-				spans multiple lines.
+    --newline-formatting error	Abort output, print an error, and exit with 1
+				when a KEY or VALUE spans multiple lines.
     --newline-formatting cut-off
 				Only output VALUE (and also a relaxed KEY) up to
 				the first newline.
@@ -345,7 +345,13 @@ getAsList()
 
 	if [ -n "$newlineFormatting" ] && [[ "$unescapedLine" =~ $'\n' ]]; then
 	    case "$newlineFormatting" in
-		error)		exit 1;;
+		error)		if [ "$isRelaxedKey" ] && [[ "$unescapedLine" =~ ^[^=]*$'\n' ]]; then
+				    printf >&2 'ERROR: Key %s spans multiple lines.\n' "${line%%=*}"
+				else
+				    printf >&2 'ERROR: Value %s spans multiple lines.\n' "${line#*=}"
+				fi
+				exit 1
+				;;
 		cut-off)	if [ "$isRelaxedKey" ]; then
 				    local key="${line%%=*}"; local value="${line#*=}"
 				    eval "local unescapedKey=$key"

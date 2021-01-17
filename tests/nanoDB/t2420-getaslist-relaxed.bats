@@ -43,6 +43,20 @@ multiple
 lines" ]
 }
 
+@test "newline table with relaxed keys can be gotten as list with newline as error" {
+    run nanoDB --table newlines --relaxed-key --get-as-list '-' --newline-formatting error
+    [ $status -eq 1 ]
+    [ "$output" = "ERROR: Key \$'key\\nwith\\nnewlines' spans multiple lines." ]
+}
+
+@test "table with relaxed keys and escaped values can be gotten as list with newline as error" {
+    run nanoDB --table escaping --relaxed-key --get-as-list '-' --newline-formatting error
+    [ $status -eq 1 ]
+
+    [ "$output" = "tabs-the	foo	now contains		tabs	
+ERROR: Value \$'this\\nnow\\ngoes\\nover\\nmultiple\\n\\nlines' spans multiple lines." ]
+}
+
 @test "newline table with relaxed keys can be gotten as list with cut-off on first newline" {
     run nanoDB --table newlines --relaxed-key --get-as-list '-' --newline-formatting cut-off
     [ $status -eq 0 ]

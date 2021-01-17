@@ -42,7 +42,8 @@ everything-		the what ?
     run nanoDB --table escaping --get-as-list '-' --newline-formatting error
     [ $status -eq 1 ]
 
-    [ "$output" = "tabs-the	foo	now contains		tabs	" ]
+    [ "$output" = "tabs-the	foo	now contains		tabs	
+ERROR: Value \$'this\\nnow\\ngoes\\nover\\nmultiple\\n\\nlines' spans multiple lines." ]
 }
 
 @test "table with escaped values can be gotten as list with cut-off on first newline" {
