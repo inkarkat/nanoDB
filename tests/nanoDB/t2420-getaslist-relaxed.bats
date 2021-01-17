@@ -50,3 +50,24 @@ lines" ]
 value with newlines-this
 key and value-this" ]
 }
+
+@test "newline table with relaxed keys can be gotten as list with newline prefixed with duplicated key" {
+    run nanoDB --table newlines --relaxed-key --get-as-list '-' --newline-formatting duplicate-key
+    [ $status -eq 0 ]
+    [ "$output" = "key-newline
+value with newlines-this
+value with newlines-now
+value with newlines-goes
+value with newlines-over
+value with newlines-multiple
+value with newlines-
+value with newlines-lines
+key and value-this
+key and value-now
+key and value-goes
+key and value-over
+key and value-multiple
+key and value-
+key and value-lines" ]
+}
+

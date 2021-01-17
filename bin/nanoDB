@@ -103,8 +103,9 @@ HELPDESCRIPTION
 				Only output VALUE (and also a relaxed KEY) up to
 				the first newline.
     --newline-formatting duplicate-key
-				On each subsequent line, prepend KEY and SEP to
-				it again.
+				On each subsequent line of VALUE, prepend KEY (a
+				relaxed KEY only up to the first newline) and
+				SEP to it again.
     --newline-formatting REPLACEMENT
 				Replace all newlines in VALUE with REPLACEMENT.
 EXIT STATUS:
@@ -353,7 +354,14 @@ getAsList()
 				    unescapedLine="${unescapedLine%%$'\n'*}"
 				fi
 				;;
-		duplicate-key)	lineKey="${unescapedLine%%=*}"; unescapedLine="${unescapedLine//$'\n'/$'\n'"${lineKey}${listSeparator}"}";;
+		duplicate-key)	lineKey="${unescapedLine%%=*}"
+				if [ "$isRelaxedKey" ]; then
+				    unescapedLine="${unescapedLine#"$lineKey"}"
+				    lineKey="${lineKey%%$'\n'*}"
+				    unescapedLine="${lineKey}${unescapedLine}"
+				fi
+				unescapedLine="${unescapedLine//$'\n'/$'\n'"${lineKey}${listSeparator}"}"
+				;;
 		*)		unescapedLine="${unescapedLine//$'\n'/"$newlineFormatting"}";;
 	    esac
 	fi
