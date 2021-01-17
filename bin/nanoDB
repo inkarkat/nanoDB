@@ -128,7 +128,7 @@ checkKey()
     elif [[ "$key" =~ = ]]; then
 	echo 'ERROR: KEY cannot contain = character.'
 	return 1
-    elif [[ ! "$key" =~ ^[[:alpha:]_][[:alnum:]_]*$ ]]; then
+    elif [ ! "$isRelaxedKey" ] && [[ ! "$key" =~ ^[[:alpha:]_][[:alnum:]_]*$ ]]; then
 	echo 'ERROR: KEY must be a valid variable name.'
 	return 1
     fi >&2
