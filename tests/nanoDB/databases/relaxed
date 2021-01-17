@@ -1,0 +1,8 @@
+key\ with\ spaces=spaces
+$'key\twith\ttabs'=tabs
+$'key\nwith\nnewlines'=newline
+O\'Brian=squote
+a\"word\"=dquote
+\"O\'Brian.\"=quotes
+the\\\ \*\ is\ \{a\,b\}=various
+$'\t\tthe what ?\n\\\tO\'Brian has "tons" of stuff\\!\n**for** // but not here'=everything
