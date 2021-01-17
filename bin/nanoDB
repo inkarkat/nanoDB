@@ -107,7 +107,8 @@ HELPDESCRIPTION
 				relaxed KEY only up to the first newline) and
 				SEP to it again.
     --newline-formatting REPLACEMENT
-				Replace all newlines in VALUE with REPLACEMENT.
+				Replace all newlines in VALUE (and a relaxed
+				KEY) with REPLACEMENT.
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -362,7 +363,8 @@ getAsList()
 				fi
 				unescapedLine="${unescapedLine//$'\n'/$'\n'"${lineKey}${listSeparator}"}"
 				;;
-		*)		unescapedLine="${unescapedLine//$'\n'/"$newlineFormatting"}";;
+		*)		unescapedLine="${unescapedLine//$'\n'/"$newlineFormatting"}"
+				;;
 	    esac
 	fi
 

@@ -71,3 +71,35 @@ key and value-
 key and value-lines" ]
 }
 
+
+@test "newline table with relaxed keys can be gotten as list with newlines replaced with XX" {
+    run nanoDB --table newlines --relaxed-key --get-as-list '-' --newline-formatting XX
+    [ $status -eq 0 ]
+    [ "$output" = "keyXXwithXXnewlines-newline
+value with newlines-thisXXnowXXgoesXXoverXXmultipleXXXXlines
+key and valueXXwithXXnewlines-thisXXnowXXgoesXXoverXXmultipleXXXXlines" ]
+}
+
+@test "newline table with relaxed keys can be gotten as list with newlines replaced with line continuation" {
+    run nanoDB --table newlines --relaxed-key --get-as-list '-' --newline-formatting $'\\\n'
+    [ $status -eq 0 ]
+    [ "$output" = "key\\
+with\\
+newlines-newline
+value with newlines-this\\
+now\\
+goes\\
+over\\
+multiple\\
+\\
+lines
+key and value\\
+with\\
+newlines-this\\
+now\\
+goes\\
+over\\
+multiple\\
+\\
+lines" ]
+}
