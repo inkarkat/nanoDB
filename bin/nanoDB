@@ -208,7 +208,7 @@ do
 				    fi >&2
 				    printf -v quotedValue %q "$v"
 				    printf -v quotedKey %q "$k"
-				    lines+=("${quotedKey}=${quotedValue//\\/\\\\}")
+				    lines+=("${quotedKey}=${quotedValue}")
 				    ;;
 			    *)	    assertValue
 				    key="$1"
@@ -230,7 +230,7 @@ do
 			fi >&2
 			printf -v quotedKey %q "$key"
 			printf -v quotedValue %q "$1"
-			lines+=("${quotedKey}=${quotedValue//\\/\\\\}")
+			lines+=("${quotedKey}=${quotedValue}")
 			shift
 			key=
 			;;
@@ -385,6 +385,8 @@ update()
     do
 	local quotedKey="${line%%=*}"
 	local literalQuotedKey="$quotedKey"; [ "$isRelaxedKey" ] && literalQuotedKey="$(printf %s "$quotedKey" | literalPattern)"
+	local quotedLine="${line//\\/\\\\}"
+
 	# If we find the key, duplicate its line into the hold space; this serves as
 	# a marker that we don't need to append the line at the end.
 	# On the last line, we check the hold space, and skip further processing of
@@ -396,11 +398,11 @@ update()
 	    -e ':skipHeader' \
 	    -e '${ x; /./{ x; b; }; x; }' \
 	    -e "\$a\\
-$line"  \
+$quotedLine"  \
 	    -e b \
 	    -e ':replaceWithUpdate' \
 	    -e "c\\
-$line"  \
+$quotedLine"  \
 	    -- "$TABLE_FILESPEC" || return 1
     done
 }
