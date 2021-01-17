@@ -18,3 +18,35 @@ the\\ * is {a,b}-various
 \\	O'Brian has \"tons\" of stuff\\!
 **for** // but not here-everything" ]
 }
+
+@test "newline table with relaxed keys can be gotten as list" {
+    run nanoDB --table newlines --relaxed-key --get-as-list '-'
+    [ $status -eq 0 ]
+    [ "$output" = "key
+with
+newlines-newline
+value with newlines-this
+now
+goes
+over
+multiple
+
+lines
+key and value
+with
+newlines-this
+now
+goes
+over
+multiple
+
+lines" ]
+}
+
+@test "newline table with relaxed keys can be gotten as list with cut-off on first newline" {
+    run nanoDB --table newlines --relaxed-key --get-as-list '-' --newline-formatting cut-off
+    [ $status -eq 0 ]
+    [ "$output" = "key-newline
+value with newlines-this
+key and value-this" ]
+}
