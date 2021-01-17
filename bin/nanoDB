@@ -23,7 +23,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-r|--relaxed-key] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE [...]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE [... ...]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
@@ -66,6 +66,10 @@ HELPDESCRIPTION
 				use. Determines the configuration directory.
     --table|-t TABLE		Category in the context of the application.
 				Determines the configuration file.
+    --relaxed-key|-R		Allow KEYs that are not valid variable names;
+				only "=" is not allowed inside KEY then.
+				This precludes the use of "eval" with --get and
+				--get-all.
     --update|-u KEY=VALUE	Record KEY='VALUE'. An existing record with the
 				same KEY is overwritten, else it is appended.
     --update KEY --value VALUE	Two-argument form.
@@ -163,6 +167,7 @@ action=
 dictName=
 listSeparator=
 newlineFormatting=
+isRelaxedKey=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -278,6 +283,7 @@ do
 			;;
 	--newline-formatting)
 			shift; newlineFormatting="$1"; shift;;
+	--relaxed-key)	shift; isRelaxedKey=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
