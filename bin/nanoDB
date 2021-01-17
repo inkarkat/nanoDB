@@ -23,7 +23,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-c|--comment COMMENT] [-n|--namespace NAMESPACE] -t|--table TABLE [-R|--relaxed-key] [-?|-h|--help]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY=VALUE [...]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -u|--update KEY -v|--value VALUE [... ...]'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
@@ -66,6 +66,10 @@ HELPDESCRIPTION
 				use. Determines the configuration directory.
     --table|-t TABLE		Category in the context of the application.
 				Determines the configuration file.
+    --relaxed-key|-R		Allow KEYs that are not valid variable names;
+				only "=" is not allowed inside KEY then.
+				This precludes the use of "eval" with --get and
+				--get-all.
     --update|-u KEY=VALUE	Record KEY='VALUE'. An existing record with the
 				same KEY is overwritten, else it is appended.
     --update KEY --value VALUE	Two-argument form.
@@ -90,17 +94,21 @@ HELPDESCRIPTION
 				Get all KEYs and 'VALUE's as a Bash associative
 				array named DICT-NAME if you "eval" the output.
     --get-as-list SEP		Get all KEYs and VALUEs as a LIST, separated by
-				SEP. By default, newlines in VALUE are output
-				as-is. This can be influenced via the following:
-    --newline-formatting error	Abort output and exit with 1 when a VALUE spans
-				multiple lines.
+				SEP. By default, newlines in VALUE (and KEY with
+				--relaxed-key) are output as-is. This can be
+				influenced via the following:
+    --newline-formatting error	Abort output and exit with 1 when a KEY or VALUE
+				spans multiple lines.
     --newline-formatting cut-off
-				Only output VALUE up to the first newline.
+				Only output VALUE (and also a relaxed KEY) up to
+				the first newline.
     --newline-formatting duplicate-key
-				On each subsequent line, prepend KEY and SEP to
-				it again.
+				On each subsequent line of VALUE, prepend KEY (a
+				relaxed KEY only up to the first newline) and
+				SEP to it again.
     --newline-formatting REPLACEMENT
-				Replace all newlines in VALUE with REPLACEMENT.
+				Replace all newlines in VALUE (and a relaxed
+				KEY) with REPLACEMENT.
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -124,12 +132,16 @@ checkKey()
     elif [[ "$key" =~ = ]]; then
 	echo 'ERROR: KEY cannot contain = character.'
 	return 1
-    elif [[ ! "$key" =~ ^[[:alpha:]_][[:alnum:]_]*$ ]]; then
+    elif [ ! "$isRelaxedKey" ] && [[ ! "$key" =~ ^[[:alpha:]_][[:alnum:]_]*$ ]]; then
 	echo 'ERROR: KEY must be a valid variable name.'
 	return 1
     fi >&2
 
     return 0
+}
+literalPattern()
+{
+    sed -e 's/[][\$*.^/]/\\&/g'
 }
 assertValue()
 {
@@ -156,13 +168,10 @@ key=
 typeset -a lines=()
 value=
 action=
-typeset -a queriedColumns=()
-typeset -A updatedColumnValues=()
-isOmitKey=
-outputFormat=
 dictName=
 listSeparator=
 newlineFormatting=
+isRelaxedKey=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -202,7 +211,8 @@ do
 					exit 2
 				    fi >&2
 				    printf -v quotedValue %q "$v"
-				    lines+=("${k}=${quotedValue//\\/\\\\}")
+				    printf -v quotedKey %q "$k"
+				    lines+=("${quotedKey}=${quotedValue}")
 				    ;;
 			    *)	    assertValue
 				    key="$1"
@@ -222,8 +232,9 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			printf -v quotedValue %q "$1"
-			lines+=("${key}=${quotedValue//\\/\\\\}")
+			lines+=("${quotedKey}=${quotedValue}")
 			shift
 			key=
 			;;
@@ -233,6 +244,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			;;
 	--truncate|-C)	shift; [ "$action" ] && multipleActionsError "$0"; action='truncate';;
 	--drop|-D)	shift; [ "$action" ] && multipleActionsError "$0"; action='drop';;
@@ -242,6 +254,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			;;
 	--get|-g)	shift; [ "$action" ] && multipleActionsError "$0"; action='get'; key="$1"; shift
 			if ! checkKey "$key"; then
@@ -249,6 +262,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			;;
 	--get-all|-G)	shift; [ "$action" ] && multipleActionsError "$0"; action='getAll';;
 	--get-as-dictionary)
@@ -273,6 +287,8 @@ do
 			;;
 	--newline-formatting)
 			shift; newlineFormatting="$1"; shift;;
+	--relaxed-key|-R)
+			shift; isRelaxedKey=t;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -330,9 +346,25 @@ getAsList()
 	if [ -n "$newlineFormatting" ] && [[ "$unescapedLine" =~ $'\n' ]]; then
 	    case "$newlineFormatting" in
 		error)		exit 1;;
-		cut-off)	unescapedLine="${unescapedLine%%$'\n'*}";;
-		duplicate-key)	lineKey="${unescapedLine%%=*}"; unescapedLine="${unescapedLine//$'\n'/$'\n'"${lineKey}${listSeparator}"}";;
-		*)		unescapedLine="${unescapedLine//$'\n'/"$newlineFormatting"}";;
+		cut-off)	if [ "$isRelaxedKey" ]; then
+				    local key="${line%%=*}"; local value="${line#*=}"
+				    eval "local unescapedKey=$key"
+				    eval "local unescapedValue=$value"
+				    unescapedLine="${unescapedKey%%$'\n'*}=${unescapedValue%%$'\n'*}"
+				else
+				    unescapedLine="${unescapedLine%%$'\n'*}"
+				fi
+				;;
+		duplicate-key)	lineKey="${unescapedLine%%=*}"
+				if [ "$isRelaxedKey" ]; then
+				    unescapedLine="${unescapedLine#"$lineKey"}"
+				    lineKey="${lineKey%%$'\n'*}"
+				    unescapedLine="${lineKey}${unescapedLine}"
+				fi
+				unescapedLine="${unescapedLine//$'\n'/$'\n'"${lineKey}${listSeparator}"}"
+				;;
+		*)		unescapedLine="${unescapedLine//$'\n'/"$newlineFormatting"}"
+				;;
 	    esac
 	fi
 
@@ -343,13 +375,14 @@ getAsList()
 get()
 {
     [ -e "$TABLE_FILESPEC" ] || return 1
-    sed -n -e "/^${key}=/{ p; q }" -e '$q 4' -- "$TABLE_FILESPEC" 2>/dev/null
+    local literalQuotedKey="$quotedKey"; [ "$isRelaxedKey" ] && literalQuotedKey="$(printf %s "$quotedKey" | literalPattern)"
+    sed -n -e "/^${literalQuotedKey}=/{ p; q }" -e '$q 4' -- "$TABLE_FILESPEC" 2>/dev/null
 }
 
 query()
 {
     local result; result="$(get)" || return $?
-    local value; eval "value=${result#${key}=}"
+    local value; eval "value=${result#"${quotedKey}="}"
 
     printf '%s\n' "$value"
 }
@@ -371,23 +404,26 @@ update()
 
     local line; for line in "${lines[@]}"
     do
-	local key="${line%%=*}"
+	local quotedKey="${line%%=*}"
+	local literalQuotedKey="$quotedKey"; [ "$isRelaxedKey" ] && literalQuotedKey="$(printf %s "$quotedKey" | literalPattern)"
+	local quotedLine="${line//\\/\\\\}"
+
 	# If we find the key, duplicate its line into the hold space; this serves as
 	# a marker that we don't need to append the line at the end.
 	# On the last line, we check the hold space, and skip further processing of
 	# the line if the hold space isn't empty.
 	sed -i \
 	    "${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
-	    -e "/^${key}=/h" \
-	    -e "/^${key}=/b replaceWithUpdate" \
+	    -e "/^${literalQuotedKey}=/h" \
+	    -e "/^${literalQuotedKey}=/b replaceWithUpdate" \
 	    -e ':skipHeader' \
 	    -e '${ x; /./{ x; b; }; x; }' \
 	    -e "\$a\\
-$line"  \
+$quotedLine"  \
 	    -e b \
 	    -e ':replaceWithUpdate' \
 	    -e "c\\
-$line"  \
+$quotedLine"  \
 	    -- "$TABLE_FILESPEC" || return 1
     done
 }
@@ -396,6 +432,7 @@ delete()
 {
     [ -e "$TABLE_FILESPEC" ] || return 1
 
+    local literalQuotedKey="$quotedKey"; [ "$isRelaxedKey" ] && literalQuotedKey="$(printf %s "$quotedKey" | literalPattern)"
     # If we find the key, duplicate its line into the hold space; this serves as
     # a marker that a deletion was done.
     # If the first line is also the last, and we find the key there, just clear
@@ -405,8 +442,8 @@ delete()
     # On the last line, we check the hold space, and indicate unsuccessful
     # deletion via a special exit status.
     sed -i \
-	-e "1{ \$ {/^${key}=/{ s/^.*\$//; q 99; } } }" \
-	-e "/^${key}=/{ h; d; }" \
+	-e "1{ \$ {/^${literalQuotedKey}=/{ s/^.*\$//; q 99; } } }" \
+	-e "/^${literalQuotedKey}=/{ h; d; }" \
 	-e '${ x; /./{ x; b; }; x; }' \
 	-e '$q 4' \
 	-- "$TABLE_FILESPEC"
