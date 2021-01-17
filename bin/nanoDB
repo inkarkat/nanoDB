@@ -131,6 +131,10 @@ checkKey()
 
     return 0
 }
+literalPattern()
+{
+    sed -e 's/[][\$*.^/]/\\&/g'
+}
 assertValue()
 {
     if [ -n "$key" ]; then
@@ -198,7 +202,8 @@ do
 					exit 2
 				    fi >&2
 				    printf -v quotedValue %q "$v"
-				    lines+=("${k}=${quotedValue//\\/\\\\}")
+				    printf -v quotedKey %q "$k"
+				    lines+=("${quotedKey}=${quotedValue//\\/\\\\}")
 				    ;;
 			    *)	    assertValue
 				    key="$1"
@@ -218,8 +223,9 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			printf -v quotedValue %q "$1"
-			lines+=("${key}=${quotedValue//\\/\\\\}")
+			lines+=("${quotedKey}=${quotedValue//\\/\\\\}")
 			shift
 			key=
 			;;
@@ -229,6 +235,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			;;
 	--truncate|-C)	shift; [ "$action" ] && multipleActionsError "$0"; action='truncate';;
 	--drop|-D)	shift; [ "$action" ] && multipleActionsError "$0"; action='drop';;
@@ -238,6 +245,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			;;
 	--get|-g)	shift; [ "$action" ] && multipleActionsError "$0"; action='get'; key="$1"; shift
 			if ! checkKey "$key"; then
@@ -245,6 +253,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
+			printf -v quotedKey %q "$key"
 			;;
 	--get-all|-G)	shift; [ "$action" ] && multipleActionsError "$0"; action='getAll';;
 	--get-as-dictionary)
@@ -339,13 +348,14 @@ getAsList()
 get()
 {
     [ -e "$TABLE_FILESPEC" ] || return 1
-    sed -n -e "/^${key}=/{ p; q }" -e '$q 4' -- "$TABLE_FILESPEC" 2>/dev/null
+    local literalQuotedKey="$(printf %s "$quotedKey" | literalPattern)"
+    sed -n -e "/^${literalQuotedKey}=/{ p; q }" -e '$q 4' -- "$TABLE_FILESPEC" 2>/dev/null
 }
 
 query()
 {
     local result; result="$(get)" || return $?
-    local value; eval "value=${result#${key}=}"
+    local value; eval "value=${result#"${quotedKey}="}"
 
     printf '%s\n' "$value"
 }
@@ -367,15 +377,16 @@ update()
 
     local line; for line in "${lines[@]}"
     do
-	local key="${line%%=*}"
+	local quotedKey="${line%%=*}"
+	local literalQuotedKey="$(printf %s "$quotedKey" | literalPattern)"
 	# If we find the key, duplicate its line into the hold space; this serves as
 	# a marker that we don't need to append the line at the end.
 	# On the last line, we check the hold space, and skip further processing of
 	# the line if the hold space isn't empty.
 	sed -i \
 	    "${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
-	    -e "/^${key}=/h" \
-	    -e "/^${key}=/b replaceWithUpdate" \
+	    -e "/^${literalQuotedKey}=/h" \
+	    -e "/^${literalQuotedKey}=/b replaceWithUpdate" \
 	    -e ':skipHeader' \
 	    -e '${ x; /./{ x; b; }; x; }' \
 	    -e "\$a\\
@@ -392,6 +403,7 @@ delete()
 {
     [ -e "$TABLE_FILESPEC" ] || return 1
 
+    local literalQuotedKey="$(printf %s "$quotedKey" | literalPattern)"
     # If we find the key, duplicate its line into the hold space; this serves as
     # a marker that a deletion was done.
     # If the first line is also the last, and we find the key there, just clear
@@ -401,8 +413,8 @@ delete()
     # On the last line, we check the hold space, and indicate unsuccessful
     # deletion via a special exit status.
     sed -i \
-	-e "1{ \$ {/^${key}=/{ s/^.*\$//; q 99; } } }" \
-	-e "/^${key}=/{ h; d; }" \
+	-e "1{ \$ {/^${literalQuotedKey}=/{ s/^.*\$//; q 99; } } }" \
+	-e "/^${literalQuotedKey}=/{ h; d; }" \
 	-e '${ x; /./{ x; b; }; x; }' \
 	-e '$q 4' \
 	-- "$TABLE_FILESPEC"
