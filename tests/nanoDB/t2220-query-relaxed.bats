@@ -26,7 +26,7 @@ load canned_databases
     [ "$output" = "squote" ]
 }
 
-@test "existing value from relaxed key with single quotes can be gotten" {
+@test "existing value from relaxed key with double quotes can be gotten" {
     run nanoDB --table relaxed --relaxed-key --query a\"word\"
     [ $status -eq 0 ]
     [ "$output" = 'dquote' ]
