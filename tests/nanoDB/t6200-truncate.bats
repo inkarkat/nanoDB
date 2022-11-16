@@ -11,7 +11,7 @@ load temp_database
     [ "${#lines[@]}" -eq 0 ]
     table_exists "$BATS_TEST_NAME"
     [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
-    assert_table_row "$BATS_TEST_NAME" 1 "# This is test data."
+    assert_table_row "$BATS_TEST_NAME" 1 "# This is test=data."
 }
 
 @test "truncate of empty database is a no-op" {
@@ -23,7 +23,7 @@ load temp_database
     [ "${#lines[@]}" -eq 0 ]
     table_exists "$BATS_TEST_NAME"
     [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
-    assert_table_row "$BATS_TEST_NAME" 1 "# This is test data." ]
+    assert_table_row "$BATS_TEST_NAME" 1 "# This is test=data." ]
 }
 
 @test "truncate of a non-existing table initializes it with an empty line" {

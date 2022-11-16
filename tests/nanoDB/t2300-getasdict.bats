@@ -23,7 +23,7 @@ myDict[baz]=Last\ one\ here' ]
 @test "commented table as dict still has the comment on top" {
     run nanoDB --table commented-entry --get-as-dictionary myDict
     [ $status -eq 0 ]
-    [ "$output" = '# This is test data.
+    [ "$output" = '# This is test=data.
 declare -A myDict
 myDict[foo]=The\ Foo\ is\ 42' ]
 }
@@ -31,7 +31,7 @@ myDict[foo]=The\ Foo\ is\ 42' ]
 @test "empty commented table as dict has the comment and the declaration only" {
     run nanoDB --table empty --get-as-dictionary myDict
     [ $status -eq 0 ]
-    [ "$output" = '# This is test data.
+    [ "$output" = '# This is test=data.
 declare -A myDict' ]
 }
 

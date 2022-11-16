@@ -44,5 +44,5 @@ load temp_database
     [ $status -eq 0 ]
     [ "${#lines[@]}" -eq 0 ]
     [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
-    assert_table_row "$BATS_TEST_NAME" 1 "# This is test data."
+    assert_table_row "$BATS_TEST_NAME" 1 "# This is test=data."
 }
