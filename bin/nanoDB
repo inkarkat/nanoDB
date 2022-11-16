@@ -318,7 +318,10 @@ fi >&2
 
 queryKeys()
 {
-    sed -ne 's/=.*$//p' -- "$TABLE_FILESPEC" 2>/dev/null || return 1
+    sed -n \
+	-e '1{ /^#/b; }' \
+	-e 's/=.*$//p' -- "$TABLE_FILESPEC" \
+	2>/dev/null || return 1
 }
 
 getAll()

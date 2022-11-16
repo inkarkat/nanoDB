@@ -25,3 +25,9 @@ load canned_databases
     [ $status -eq 1 ]
     [ "$output" = "" ]
 }
+
+@test "existing single key on a commented table omits the comment" {
+    run nanoDB --table commented-entry --query-keys
+    [ $status -eq 0 ]
+    [ "$output" = 'foo' ]
+}
