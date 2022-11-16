@@ -326,15 +326,10 @@ obtainKeys()
 queryKeys()
 {
     if [ "$isRelaxedKey" ]; then
-	# Need to Bash-unquote each key separately.
-	typeset -a quotedKeys; readarray -t quotedKeys < <(obtainKeys; printf '\n%d\n' "$?")	# Exit status from the process substitution is lost; return the actual exit status via an appended additional line.
-	[ ${quotedKeys[-1]} -ne 0 ] && return ${quotedKeys[-1]}
-	unset 'quotedKeys[-1]'
-	[ -z "${quotedKeys[-1]}" ] && unset 'quotedKeys[-1]'
-	local quotedKey; for quotedKey in "${quotedKeys[@]}"
-	do
-	    eval "printf %s\\\\n $quotedKey"
-	done
+	contents="$(obtainKeys)" || return $?
+	# Need to quote actual newlines so that the entire string can be
+	# Bash-unquoted all at once.
+	eval "printf %s\\\\n ${contents//$'\n'/\$\'\\n\'}"
     else
 	obtainKeys
     fi
