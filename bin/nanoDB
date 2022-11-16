@@ -316,12 +316,28 @@ elif [ ! "$table" ]; then
 fi >&2
 
 
-queryKeys()
+obtainKeys()
 {
     sed -n \
 	-e '1{ /^#/b; }' \
 	-e 's/=.*$//p' -- "$TABLE_FILESPEC" \
 	2>/dev/null || return 1
+}
+queryKeys()
+{
+    if [ "$isRelaxedKey" ]; then
+	# Need to Bash-unquote each key separately.
+	typeset -a quotedKeys; readarray -t quotedKeys < <(obtainKeys; printf '\n%d\n' "$?")	# Exit status from the process substitution is lost; return the actual exit status via an appended additional line.
+	[ ${quotedKeys[-1]} -ne 0 ] && return ${quotedKeys[-1]}
+	unset 'quotedKeys[-1]'
+	[ -z "${quotedKeys[-1]}" ] && unset 'quotedKeys[-1]'
+	local quotedKey; for quotedKey in "${quotedKeys[@]}"
+	do
+	    eval "printf %s\\\\n $quotedKey"
+	done
+    else
+	obtainKeys
+    fi
 }
 
 getAll()

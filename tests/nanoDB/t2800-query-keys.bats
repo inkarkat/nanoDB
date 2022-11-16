@@ -31,3 +31,20 @@ load canned_databases
     [ $status -eq 0 ]
     [ "$output" = 'foo' ]
 }
+
+@test "existing relaxed keys are returned in unescaped form" {
+    run nanoDB --table relaxed --relaxed-key --query-keys
+    [ $status -eq 0 ]
+    [ "$output" = "key with spaces
+key	with	tabs
+key
+with
+newlines
+O'Brian
+a\"word\"
+\"O'Brian.\"
+the\\ * is {a,b}
+		the what ?
+\\	O'Brian has \"tons\" of stuff\\!
+**for** // but not here" ]
+}
