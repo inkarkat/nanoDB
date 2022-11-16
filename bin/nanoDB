@@ -30,6 +30,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -C|--truncate'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -q|--query KEY'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -k|--query-keys'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -g|--get KEY'
     printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME|--get-as-list SEP [--newline-formatting error|cut-off|duplicate-key|REPLACEMENT]'
 }
@@ -84,6 +85,7 @@ HELPDESCRIPTION
 				configuration file itself.
     --query|-q KEY		Query whether a value for KEY exists and return
 				it.
+    --query-keys|-k		List all available keys.
     --get|-g KEY		Return the entire KEY='VALUE' if it exists. You
 				can "eval" the result to obtain a shell variable
 				named KEY with a value of VALUE.
@@ -153,7 +155,7 @@ assertValue()
     fi >&2
 }
 
-readonly ACTIONS='--update, --delete, --truncate, --drop, --query, --get, --get-all, --get-as-dictionary, --get-as-list'
+readonly ACTIONS='--update, --delete, --truncate, --drop, --query, --query-keys, --get, --get-all, --get-as-dictionary, --get-as-list'
 multipleActionsError()
 {
     echo >&2 "ERROR: Only one of $ACTIONS allowed."
@@ -256,6 +258,8 @@ do
 			fi >&2
 			printf -v quotedKey %q "$key"
 			;;
+	--query-keys|-k)
+			shift; [ "$action" ] && multipleActionsError "$0"; action='queryKeys';;
 	--get|-g)	shift; [ "$action" ] && multipleActionsError "$0"; action='get'; key="$1"; shift
 			if ! checkKey "$key"; then
 			    echo
@@ -311,6 +315,11 @@ elif [ ! "$table" ]; then
     exit 2
 fi >&2
 
+
+queryKeys()
+{
+    sed -ne 's/=.*$//p' -- "$TABLE_FILESPEC" 2>/dev/null || return 1
+}
 
 getAll()
 {
