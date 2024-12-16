@@ -2,6 +2,8 @@
 
 _A primitive file-based dictionary supporting CRUD operations._
 
+![Build Status](https://github.com/inkarkat/nanoDB/actions/workflows/build.yml/badge.svg)
+
 This small tool serves as a minimal file-based persistent key-value database supporting CRUD operations with a single lookup key. Assuming infrequent access by a single application, there's no file locking.
 
 Many applications implement this on their own (and usually within a few lines with `read` and `grep`); by delegating to this tool, one gets a robust yet small implementation, consistency in usage and storage locations, and the possibility to easily upgrade to the more powerful yet similar [`miniDB`](https://github.com/inkarkat/miniDB) API.
